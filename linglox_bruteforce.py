@@ -2,8 +2,8 @@ import json
 import keyboard
 import threading
 import time
-import pyautogui
 import os
+import sys
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
@@ -12,31 +12,25 @@ root = tk.Tk()
 root.title("Linglox Bruteforcer")
 root.geometry("300x300")
 
-pyautogui.PAUSE = 0
-
 stop_typing_var = False
 word_list = []
 hotkeys_active = False
-twowordsON = tk.BooleanVar()
-teor = tk.BooleanVar()
 
 interval = 0.05
 
-with open("words_dictionary.json") as f:
+base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+with open(os.path.join(base, "words_dictionary.json")) as f:
     words = json.load(f)
 
 def get_words(first_letter, word_length, last_letter="", contains=""):
     status_label.config(text="Words fetched succesfully.")
-    if last_letter == "":
-        if contains == "":
-            return [word for word in words if len(word) == word_length and word.lower().startswith(first_letter)]
-        else:
-            return [word for word in words if len(word) == word_length and word.lower().startswith(first_letter) and contains in word.lower()]
-    else:
-        if contains == "":
-            return [word for word in words if len(word) == word_length and word.lower().startswith(first_letter) and word.lower().endswith(last_letter)]
-        else:
-            return [word for word in words if len(word) == word_length and word.lower().startswith(first_letter) and word.lower().endswith(last_letter) and contains in word.lower()]
+    return [
+        word for word in words
+        if len(word) == word_length
+        and word.lower().startswith(first_letter)
+        and (not last_letter or word.lower().endswith(last_letter))
+        and (not contains or contains in word.lower())
+    ]
 
 def check_words():
     global word_list
@@ -56,29 +50,20 @@ def check_words():
     if wordlength < 2:
         status_label.config(text="Word length can't be smaller than 2.")
         return
+    if lastletter and not lastletter.isalpha():
+        status_label.config(text="Last letter must be a letter.")
+        return
+    if contains and not contains.isalpha():
+        status_label.config(text="Contains must be a letter.")
+        return
     
-    if lastletter == "":
-        if contains == "":
-            word_list = get_words(firstletter, wordlength) # no last letter, no contains
-        else:
-            if contains.isalpha():
-                word_list = get_words(firstletter, wordlength, contains=contains) # no last letter, contains
-            else:
-                status_label.config(text="Contains must be a letter.")
-                return
-    else:
-        if lastletter.isalpha():
-            if contains == "":
-                word_list = get_words(firstletter, wordlength, lastletter) # last letter, no contains
-            else:
-                if contains.isalpha():
-                    word_list = get_words(firstletter, wordlength, lastletter, contains) # last letter, contains
-                else:
-                    status_label.config(text="Contains must be a letter.")
-                    return
-        else:
-            status_label.config(text="Last letter must be a letter.")
-            return
+    kwargs = {}
+    if lastletter:
+        kwargs["last_letter"] = lastletter
+    if contains:
+        kwargs["contains"] = contains
+
+    word_list = get_words(firstletter, wordlength, **kwargs)
 
 def show_words():
     if len(word_list) == 0:
@@ -98,7 +83,7 @@ def type_words():
         time.sleep(interval)
 
 def show_help():
-    tk.messagebox.showinfo("How to use", "1. Fetch your words using the parameters and the 'Get Words' button.\n2. Go into Linglox, click on a textbox and press F1.\n3. The bruteforcer will try every word in the word list, if gets it correct, press F2 to stop.\n\nNote that this won't work on every single block/prompt. It just tries the most common words.\n\nSet your interval depending on your pc performance. (Try higher intervals if your pc can't handle it, try lowering if it can.)")
+    tk.messagebox.showinfo("How to use", "1. Input the parameters and fetch your words using the 'Get Words' button.\n2. Go into Linglox, click on a textbox and press F1.\n3. The bruteforcer will try every word in the word list, if gets it correct, press F2 to stop.\n\nNote that this won't work on every single block/prompt. It just tries the most common words.\n\nSet the interval depending on the word length and your pc performance (If it's too low some words will not finish typing and it'll glitch out)")
 
 def start_typing():
     global stop_typing_var
@@ -141,13 +126,15 @@ def focusOut():
     keyboard.add_hotkey("esc", stop_program, suppress=True)
     hotkeys_active = True
 
+############ UI ###########
+
 frameFirst = ttk.Frame(root)
 frameFirst.pack(pady=5)
 
 firstletter_typebox = ttk.Entry(frameFirst, width=5)
 firstletter_typebox.pack(side="left", padx=5)
 
-firstletter_label = ttk.Label(frameFirst, text="First letter")
+firstletter_label = ttk.Label(frameFirst, text="Starts on")
 firstletter_label.pack(side="left", padx=5)
 
 frameLast = ttk.Frame(root)
@@ -156,7 +143,7 @@ frameLast.pack(pady=5)
 lastletter_typebox = ttk.Entry(frameLast, width=5)
 lastletter_typebox.pack(side="left", padx=5)
 
-lastletter_label = ttk.Label(frameLast, text="Last letter (optional)")
+lastletter_label = ttk.Label(frameLast, text="Ends on (optional)")
 lastletter_label.pack(side="left", padx=5)
 
 frameContains = ttk.Frame(root)
